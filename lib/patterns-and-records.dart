@@ -41,7 +41,7 @@ const documentJson = '''
 {
   "metadata": {
     "title": "My Document",
-    "modified": "2023-05-10"
+    "modified": "2024-02-04"
   },
   "blocks": [
     {
@@ -54,7 +54,7 @@ const documentJson = '''
     },
     {
       "type": "checkbox",
-      "checked": false,
+      "checked": true,
       "text": "Learn Dart 3"
     }
   ]
@@ -86,19 +86,50 @@ class Document {
   }
 }
 
-class Block {
-  final String type;
+class HeaderBlock extends Block {
   final String text;
+  HeaderBlock(this.text);
+}
 
-  Block(this.text, this.type);
+class ParagraphBlock extends Block {
+  final String text;
+  ParagraphBlock(this.text);
+}
+
+class CheckboxBlock extends Block {
+  final String text;
+  final bool checked;
+  CheckboxBlock(this.text, this.checked);
+}
+
+// Enums in Dart
+sealed class Block {
+  Block();
 
   factory Block.fromjson(Map<String, dynamic> json) {
-    if (json case {"text": String text, "type": String type}) {
-      return Block(text, type);
-    } else {
-      throw const FormatException("Unexpected Json");
-    }
+    return switch (json) {
+      {"type": "h1", "text": String text} => HeaderBlock(text),
+      {"type": "p", "text": String text} => ParagraphBlock(text),
+      {"type": "checkbox", "text": String text, "checked": bool checked} =>
+        CheckboxBlock(text, checked),
+      _ => throw const FormatException("Unexpected JSON"),
+    };
   }
+}
+
+String formatDate(DateTime dateTime) {
+  final now = DateTime.now();
+  final difference = dateTime.difference(now);
+  return switch (difference) {
+    Duration(inDays: 0) => "today",
+    Duration(inDays: 1) => "tomorrow",
+    Duration(inDays: -1) => "yesterday",
+    Duration(inDays: final days) when days >= 7 =>
+      "${days ~/ 7} weeks from now",
+    Duration(inDays: final days) when days <= -7 => "${days ~/ 7} weeks ago",
+    Duration(inDays: final days, isNegative: true) => "$days days ago",
+    Duration(inDays: final days) => "$days days later",
+  };
 }
 
 class DocumentScreen extends StatelessWidget {
@@ -114,7 +145,7 @@ class DocumentScreen extends StatelessWidget {
       body: Column(
         children: [
           Center(
-            child: Text('Last modified on $modified'),
+            child: Text('Last modified ${formatDate(modified)}'),
           ),
           Expanded(
               child: ListView.builder(
@@ -134,22 +165,20 @@ class BlockWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    TextStyle? textStyle;
-    switch (block.type) {
-      case 'h1':
-        textStyle = Theme.of(context).textTheme.displayMedium;
-      case 'p' || 'checkbox':
-        textStyle = Theme.of(context).textTheme.bodyMedium;
-      case _:
-        textStyle = Theme.of(context).textTheme.bodySmall;
-    }
-
     return Container(
-      margin: const EdgeInsets.all(8),
-      child: Text(
-        block.text,
-        style: textStyle,
-      ),
-    );
+        margin: const EdgeInsets.all(8),
+        child: switch (block) {
+          HeaderBlock(:final text) => Text(
+              text,
+              style: Theme.of(context).textTheme.displayMedium,
+            ),
+          ParagraphBlock(:final text) => Text(text),
+          CheckboxBlock(:final text, :final checked) => Row(
+              children: [
+                Checkbox(value: checked, onChanged: (_) {}),
+                Text(text)
+              ],
+            )
+        });
   }
 }
